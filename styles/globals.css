@@ -1,0 +1,79 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #0e1210;
+  color: #edefea;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+/* Visible keyboard focus, kept consistent across the app */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #6abe86;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #4c9a6a;
+  color: #0e1210;
+}
+
+/* Thin hairline divider used throughout the "ledger" layout */
+.hairline {
+  border-color: #293029;
+}
+
+/* Faint ruled-paper texture reserved for large hero/section backdrops */
+.ledger-rule {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(237, 239, 234, 0.05) 0px,
+    rgba(237, 239, 234, 0.05) 1px,
+    transparent 1px,
+    transparent 44px
+  );
+}
+
+/* Tabular figures for anything money/number related */
+.figures {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-feature-settings: "tnum" 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* One deliberate page-load reveal for the hero, nothing else animates on load */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise-in {
+  animation: rise-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
