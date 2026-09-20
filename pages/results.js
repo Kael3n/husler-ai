@@ -119,9 +119,9 @@ export default function Results() {
     );
   }
 
-  const limit = premium ? RESULT_LIMITS.pro : RESULT_LIMITS.free;
+  const limit = premium ? results.length : RESULT_LIMITS.free;
   const visible = results.slice(0, limit);
-  const lockedCount = Math.min(results.length, RESULT_LIMITS.pro) - visible.length;
+  const lockedCount = premium ? 0 : Math.min(RESULT_LIMITS.lockedTeaser, results.length - visible.length);
 
   return (
     <Layout title="Your results — HustleFinder AI">

@@ -1,42 +1,74 @@
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import PricingCard from "../components/PricingCard";
 import { isPremium, setPremium } from "../lib/storage";
 
 export default function Pricing() {
+  const router = useRouter();
   const [premium, setPremiumState] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [banner, setBanner] = useState(null); // { type: "success" | "error" | "canceled", text }
 
   useEffect(() => {
     setPremiumState(isPremium());
   }, []);
 
-  // -----------------------------------------------------------------
-  // PLACEHOLDER — connect Stripe here.
-  //
-  // This button does not charge anyone. It only flips a localStorage
-  // flag so you can preview what the Pro experience looks like.
-  //
-  // To wire up real payments:
-  //   1. Create a Stripe account + a Product/Price for the $7.99/mo plan.
-  //   2. Add a Next.js API route, e.g. pages/api/create-checkout-session.js,
-  //      that creates a Stripe Checkout Session server-side using your
-  //      secret key (never expose it in the browser).
-  //   3. Replace handleUpgradeClick() below with a call to that route,
-  //      then redirect the browser to the returned Stripe Checkout URL:
-  //
-  //        const res = await fetch("/api/create-checkout-session", { method: "POST" });
-  //        const { url } = await res.json();
-  //        window.location.href = url;
-  //
-  //   4. Add a Stripe webhook (pages/api/webhooks/stripe.js) that listens
-  //      for checkout.session.completed / customer.subscription.deleted
-  //      and updates the user's plan in your database (see lib/storage.js
-  //      for where the "is this user premium?" check currently lives).
-  // -----------------------------------------------------------------
-  function handleUpgradeClick() {
-    const next = !premium;
-    setPremium(next);
-    setPremiumState(next);
+  // After a successful Stripe Checkout, the browser lands back here with
+  // ?success=true&session_id=.... Verify it server-side (see
+  // pages/api/verify-session.js) before unlocking anything locally.
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const { success, canceled, session_id } = router.query;
+
+    if (success === "true" && session_id) {
+      (async () => {
+        try {
+          const res = await fetch(`/api/verify-session?session_id=${encodeURIComponent(session_id)}`);
+          const data = await res.json();
+          if (data.paid) {
+            setPremium(true);
+            setPremiumState(true);
+            setBanner({ type: "success", text: "Payment confirmed — Pro is unlocked in this browser." });
+          } else {
+            setBanner({ type: "error", text: "We couldn't confirm that payment went through yet." });
+          }
+        } catch {
+          setBanner({ type: "error", text: "Something went wrong confirming your payment." });
+        }
+        router.replace("/pricing", undefined, { shallow: true });
+      })();
+    } else if (canceled === "true") {
+      setBanner({ type: "canceled", text: "Checkout canceled — you weren't charged." });
+      router.replace("/pricing", undefined, { shallow: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
+
+  async function handleUpgradeClick() {
+    setLoading(true);
+    setBanner(null);
+    try {
+      const res = await fetch("/api/create-checkout-session", { method: "POST" });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url; // redirect to Stripe's hosted checkout page
+      } else {
+        setBanner({ type: "error", text: data.error || "Unable to start checkout." });
+        setLoading(false);
+      }
+    } catch {
+      setBanner({ type: "error", text: "Unable to reach the checkout server." });
+      setLoading(false);
+    }
+  }
+
+  // Local-only reset for this browser. This does NOT cancel a real Stripe
+  // subscription — see the note below the pricing cards.
+  function handleResetLocalDemo() {
+    setPremium(false);
+    setPremiumState(false);
   }
 
   return (
@@ -48,6 +80,20 @@ export default function Pricing() {
             Try it free. Upgrade when you want the full list and the tools to act on it.
           </p>
         </div>
+
+        {banner && (
+          <div
+            className={`mx-auto mt-8 max-w-xl rounded-card border px-4 py-3 text-center text-sm ${
+              banner.type === "success"
+                ? "border-cash/40 bg-cash/10 text-cash-bright"
+                : banner.type === "canceled"
+                ? "border-ink-border bg-ink-panel text-paper-dim"
+                : "border-gold/40 bg-gold/10 text-gold"
+            }`}
+          >
+            {banner.text}
+          </div>
+        )}
 
         <div className="mt-14 grid gap-6 sm:grid-cols-2">
           <PricingCard
@@ -77,23 +123,40 @@ export default function Pricing() {
               "AI-generated business names",
               "Marketing & social content ideas",
             ]}
-            cta={premium ? "Downgrade to Free (demo)" : "Upgrade to Pro (demo)"}
-            onClick={handleUpgradeClick}
+            cta={loading ? "Redirecting to checkout…" : premium ? "You're on Pro" : "Upgrade to Pro"}
+            onClick={premium || loading ? undefined : handleUpgradeClick}
             highlighted
           />
         </div>
 
-        <p className="mt-6 text-center text-xs text-paper-faint">
-          Payments aren't connected yet — the Pro button above only simulates the upgrade in
-          your browser so you can preview the experience.
-        </p>
+        <div className="mx-auto mt-6 max-w-xl text-center text-xs text-paper-faint">
+          {premium ? (
+            <p>
+              Checkout runs through Stripe's test mode right now, so no real card is charged.{" "}
+              <button onClick={handleResetLocalDemo} className="underline hover:text-paper-dim">
+                Reset Pro status in this browser
+              </button>{" "}
+              — note this only clears the local flag; it does not cancel anything in Stripe.
+              Real self-serve cancellation needs user accounts, which aren't built yet (see README).
+            </p>
+          ) : (
+            <p>
+              Checkout runs through Stripe's test mode right now — use card number 4242 4242 4242 4242,
+              any future expiry date, and any CVC to simulate a successful payment.
+            </p>
+          )}
+        </div>
 
         <div className="mx-auto mt-20 max-w-2xl border-t border-ink-border pt-10">
           <h2 className="font-display text-2xl text-paper">A couple of things worth knowing</h2>
           <div className="mt-6 space-y-6 text-sm text-paper-dim">
             <div>
               <p className="font-semibold text-paper">Can I cancel anytime?</p>
-              <p className="mt-1">Once billing is connected, yes — Pro will be a standard monthly subscription with no lock-in.</p>
+              <p className="mt-1">
+                Once real (non-test) billing is live, yes — Pro will be a standard monthly
+                subscription with no lock-in. Self-serve cancellation from this site specifically
+                needs user accounts, which aren't built yet.
+              </p>
             </div>
             <div>
               <p className="font-semibold text-paper">Is there a free trial of Pro?</p>

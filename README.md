@@ -65,10 +65,26 @@ AI API call on top (e.g. to write more personalized "why this matches you" copy,
 entirely new hustles beyond the sample set) via a new Next.js API route that calls the
 Anthropic API server-side.
 
-**Stripe payments** — `pages/pricing.js`. The "Upgrade to Pro" button currently just flips a
-`localStorage` flag. The comment block above `handleUpgradeClick()` walks through creating a
-Stripe Product/Price, adding a `pages/api/create-checkout-session.js` route, redirecting to
-Stripe Checkout, and adding a webhook to update the user's plan after payment.
+**Stripe payments** — this is now wired up in test mode. `pages/api/create-checkout-session.js`
+creates a real Stripe Checkout Session, `pages/pricing.js` redirects to it, and
+`pages/api/verify-session.js` confirms server-side that a session actually shows a completed
+payment before unlocking Pro. Two environment variables are required — set these in
+**Vercel → your project → Settings → Environment Variables** (never commit them to the repo):
+
+```
+STRIPE_SECRET_KEY   your sk_test_... key (sk_live_... once you go live)
+STRIPE_PRICE_ID     the price_... ID for the $7.99/month Pro plan
+```
+
+After adding them, redeploy (Vercel does this automatically on the next push, or you can
+trigger a redeploy manually from the Deployments tab). To test a payment without a real card,
+use Stripe's test card number `4242 4242 4242 4242`, any future expiry date, and any CVC.
+
+**Known limitation:** Pro status still only lives in the browser's `localStorage`, exactly
+like the old demo toggle — a real payment now unlocks it, but it isn't yet tied to an actual
+account, so it won't follow the same person to a different browser or device, and there's no
+webhook yet to handle subscription cancellations/renewals happening on Stripe's side. Fixing
+that is the next step, and needs the "database + accounts" piece described below first.
 
 **A database** — `lib/storage.js`. Every function here (`saveFormData`, `getResults`,
 `isPremium`, etc.) currently reads/writes `localStorage`. The comment at the top shows how to

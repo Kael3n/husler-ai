@@ -15,12 +15,14 @@ const initialForm = {
   desiredIncome: "",
 };
 
-function Field({ label, hint, children }) {
+function Field({ label, hint, htmlFor, children }) {
   return (
     <div className="border-t border-ink-border py-6 first:border-t-0 first:pt-0">
       <div className="grid gap-2 sm:grid-cols-[220px_1fr] sm:gap-8">
         <div>
-          <label className="text-sm font-semibold text-paper">{label}</label>
+          <label htmlFor={htmlFor} className="text-sm font-semibold text-paper">
+            {label}
+          </label>
           {hint && <p className="mt-1 text-xs text-paper-faint">{hint}</p>}
         </div>
         <div>{children}</div>
@@ -73,8 +75,9 @@ export default function FindAHustle() {
         </p>
 
         <form onSubmit={handleSubmit} className="mt-10">
-          <Field label="Age">
+          <Field label="Age" htmlFor="age">
             <input
+              id="age"
               type="number"
               min="13"
               max="100"
@@ -86,8 +89,9 @@ export default function FindAHustle() {
             />
           </Field>
 
-          <Field label="City/state or country" hint="Used to flag local-only ideas that fit your area.">
+          <Field label="City/state or country" htmlFor="location" hint="Used to flag local-only ideas that fit your area.">
             <input
+              id="location"
               type="text"
               required
               value={form.location}
@@ -97,10 +101,11 @@ export default function FindAHustle() {
             />
           </Field>
 
-          <Field label="Starting budget" hint="How much you could realistically put in on day one.">
+          <Field label="Starting budget" htmlFor="budget" hint="How much you could realistically put in on day one.">
             <div className="relative">
               <span className="figures pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-paper-faint">$</span>
               <input
+                id="budget"
                 type="number"
                 min="0"
                 required
@@ -112,8 +117,9 @@ export default function FindAHustle() {
             </div>
           </Field>
 
-          <Field label="Skills & interests" hint="A few words is plenty — writing, cars, fitness, design, teaching...">
+          <Field label="Skills & interests" htmlFor="skills" hint="A few words is plenty — writing, cars, fitness, design, teaching...">
             <textarea
+              id="skills"
               rows={3}
               value={form.skills}
               onChange={(e) => update("skills", e.target.value)}
@@ -122,8 +128,9 @@ export default function FindAHustle() {
             />
           </Field>
 
-          <Field label="Hours available per week">
+          <Field label="Hours available per week" htmlFor="hoursPerWeek">
             <input
+              id="hoursPerWeek"
               type="number"
               min="1"
               max="80"
@@ -136,7 +143,7 @@ export default function FindAHustle() {
           </Field>
 
           <Field label="Online, local, or both">
-            <div className="flex flex-wrap gap-3">
+            <div role="group" aria-label="Work preference" className="flex flex-wrap gap-3">
               {[
                 { value: "online", label: "Online only" },
                 { value: "local", label: "Local only" },
@@ -145,6 +152,7 @@ export default function FindAHustle() {
                 <button
                   type="button"
                   key={opt.value}
+                  aria-pressed={form.mode === opt.value}
                   onClick={() => update("mode", opt.value)}
                   className={`rounded-card border px-4 py-2 text-sm transition-colors ${
                     form.mode === opt.value
@@ -158,10 +166,11 @@ export default function FindAHustle() {
             </div>
           </Field>
 
-          <Field label="Desired monthly income" hint="What would feel worth the effort?">
+          <Field label="Desired monthly income" htmlFor="desiredIncome" hint="What would feel worth the effort?">
             <div className="relative">
               <span className="figures pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-paper-faint">$</span>
               <input
+                id="desiredIncome"
                 type="number"
                 min="0"
                 value={form.desiredIncome}
