@@ -49,15 +49,15 @@ export default function Terms() {
             </p>
             <p className="mt-2">
               <strong className="text-paper">Cancellation:</strong> self-serve cancellation from
-              this site isn't built yet as of this version. To cancel, contact us at [add a real
-              support email before launch] and we'll process it manually, or cancel directly
+              this site isn't built yet as of this version. To cancel, contact us at
+              hustlefinderai.help@gmail.com and we'll process it manually, or cancel directly
               through Stripe's customer portal if you have access to it.
             </p>
             <p className="mt-2">
-              <strong className="text-paper">Refunds:</strong> [decide your actual refund policy
-              here before launch — e.g. "charges are non-refundable except where required by
-              law" or "contact us within 7 days of a charge for a refund review." This needs a
-              real decision from you, not a default we're picking for you.]
+              <strong className="text-paper">Refunds:</strong> All charges are final and
+              non-refundable. Canceling stops future billing but doesn't refund the current
+              billing period. If a jurisdiction's consumer protection law grants you a
+              non-waivable refund right regardless of this policy, that law controls.
             </p>
           </div>
 
@@ -98,7 +98,7 @@ export default function Terms() {
 
           <div>
             <h2 className="font-display text-xl text-paper">Contact</h2>
-            <p className="mt-2">Questions about these terms: [add a real contact email before launch].</p>
+            <p className="mt-2">Questions about these terms: hustlefinderai.help@gmail.com.</p>
           </div>
         </div>
 

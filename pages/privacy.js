@@ -77,8 +77,7 @@ export default function Privacy() {
             <h2 className="font-display text-xl text-paper">Data retention and deletion</h2>
             <p className="mt-2">
               We keep your account information for as long as your account exists. To request
-              deletion of your account and associated data, contact us at [add a real support
-              email before launch]. Note that Stripe retains its own transaction records
+              deletion of your account and associated data, contact us at hustlefinderai.help@gmail.com. Note that Stripe retains its own transaction records
               independently, as required for their own legal and accounting obligations.
             </p>
           </div>
@@ -113,7 +112,7 @@ export default function Privacy() {
           <div>
             <h2 className="font-display text-xl text-paper">Contact</h2>
             <p className="mt-2">
-              Questions about this policy or your data: [add a real contact email before launch].
+              Questions about this policy or your data: hustlefinderai.help@gmail.com.
             </p>
           </div>
         </div>
