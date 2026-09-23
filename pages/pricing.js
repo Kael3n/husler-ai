@@ -1,75 +1,91 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
+import { useSession } from "next-auth/react";
 import Layout from "../components/Layout";
 import PricingCard from "../components/PricingCard";
-import { isPremium, setPremium } from "../lib/storage";
 
 export default function Pricing() {
   const router = useRouter();
-  const [premium, setPremiumState] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [banner, setBanner] = useState(null); // { type: "success" | "error" | "canceled", text }
+  const { data: authSession, status: authStatus } = useSession();
+  const [me, setMe] = useState(null); // { loggedIn, isPro, email } from /api/me
+  const [loadingCheckout, setLoadingCheckout] = useState(false);
+  const [banner, setBanner] = useState(null);
+  const pollRef = useRef(null);
+
+  async function refreshMe() {
+    try {
+      const res = await fetch("/api/me");
+      const data = await res.json();
+      setMe(data);
+      return data;
+    } catch {
+      return null;
+    }
+  }
 
   useEffect(() => {
-    setPremiumState(isPremium());
-  }, []);
+    if (authStatus !== "loading") refreshMe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus]);
 
-  // After a successful Stripe Checkout, the browser lands back here with
-  // ?success=true&session_id=.... Verify it server-side (see
-  // pages/api/verify-session.js) before unlocking anything locally.
+  // After returning from Stripe Checkout, the webhook needs a moment to
+  // fire before the database actually shows is_pro = true. Poll /api/me
+  // a few times rather than trusting the URL parameter alone.
   useEffect(() => {
     if (!router.isReady) return;
+    const { success, canceled } = router.query;
 
-    const { success, canceled, session_id } = router.query;
-
-    if (success === "true" && session_id) {
-      (async () => {
-        try {
-          const res = await fetch(`/api/verify-session?session_id=${encodeURIComponent(session_id)}`);
-          const data = await res.json();
-          if (data.paid) {
-            setPremium(true);
-            setPremiumState(true);
-            setBanner({ type: "success", text: "Payment confirmed — Pro is unlocked in this browser." });
-          } else {
-            setBanner({ type: "error", text: "We couldn't confirm that payment went through yet." });
-          }
-        } catch {
-          setBanner({ type: "error", text: "Something went wrong confirming your payment." });
+    if (success === "true") {
+      setBanner({ type: "pending", text: "Confirming your payment…" });
+      let attempts = 0;
+      pollRef.current = setInterval(async () => {
+        attempts += 1;
+        const data = await refreshMe();
+        if (data?.isPro) {
+          clearInterval(pollRef.current);
+          setBanner({ type: "success", text: "Payment confirmed — Pro is unlocked on your account." });
+        } else if (attempts >= 8) {
+          clearInterval(pollRef.current);
+          setBanner({
+            type: "error",
+            text: "Payment is processing — refresh this page in a moment if Pro doesn't show up yet.",
+          });
         }
-        router.replace("/pricing", undefined, { shallow: true });
-      })();
+      }, 2000);
+      router.replace("/pricing", undefined, { shallow: true });
     } else if (canceled === "true") {
       setBanner({ type: "canceled", text: "Checkout canceled — you weren't charged." });
       router.replace("/pricing", undefined, { shallow: true });
     }
+
+    return () => clearInterval(pollRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady]);
 
   async function handleUpgradeClick() {
-    setLoading(true);
+    if (authStatus !== "authenticated") {
+      router.push("/signup");
+      return;
+    }
+
+    setLoadingCheckout(true);
     setBanner(null);
     try {
       const res = await fetch("/api/create-checkout-session", { method: "POST" });
       const data = await res.json();
       if (data.url) {
-        window.location.href = data.url; // redirect to Stripe's hosted checkout page
+        window.location.href = data.url;
       } else {
         setBanner({ type: "error", text: data.error || "Unable to start checkout." });
-        setLoading(false);
+        setLoadingCheckout(false);
       }
     } catch {
       setBanner({ type: "error", text: "Unable to reach the checkout server." });
-      setLoading(false);
+      setLoadingCheckout(false);
     }
   }
 
-  // Local-only reset for this browser. This does NOT cancel a real Stripe
-  // subscription — see the note below the pricing cards.
-  function handleResetLocalDemo() {
-    setPremium(false);
-    setPremiumState(false);
-  }
+  const isPro = me?.isPro || false;
 
   return (
     <Layout title="Pricing — HustleFinder AI">
@@ -86,7 +102,7 @@ export default function Pricing() {
             className={`mx-auto mt-8 max-w-xl rounded-card border px-4 py-3 text-center text-sm ${
               banner.type === "success"
                 ? "border-cash/40 bg-cash/10 text-cash-bright"
-                : banner.type === "canceled"
+                : banner.type === "canceled" || banner.type === "pending"
                 ? "border-ink-border bg-ink-panel text-paper-dim"
                 : "border-gold/40 bg-gold/10 text-gold"
             }`}
@@ -107,7 +123,7 @@ export default function Pricing() {
               "Step-by-step getting-started plan",
               "Common mistakes to avoid",
             ]}
-            cta={premium ? "Currently on Pro" : "Get started"}
+            cta={isPro ? "Currently on Pro" : "Get started"}
             href="/find-a-hustle"
           />
           <PricingCard
@@ -123,27 +139,30 @@ export default function Pricing() {
               "AI-generated business names",
               "Marketing & social content ideas",
             ]}
-            cta={loading ? "Redirecting to checkout…" : premium ? "You're on Pro" : "Upgrade to Pro"}
-            onClick={premium || loading ? undefined : handleUpgradeClick}
+            cta={
+              loadingCheckout
+                ? "Redirecting to checkout…"
+                : isPro
+                ? "You're on Pro"
+                : authStatus === "authenticated"
+                ? "Upgrade to Pro"
+                : "Sign up to upgrade"
+            }
+            onClick={isPro || loadingCheckout ? undefined : handleUpgradeClick}
             highlighted
           />
         </div>
 
         <div className="mx-auto mt-6 max-w-xl text-center text-xs text-paper-faint">
-          {premium ? (
+          {isPro ? (
+            <p>You're logged in as {me.email}. Checkout runs through Stripe's test mode right now, so no real card is charged.</p>
+          ) : authStatus === "authenticated" ? (
             <p>
-              Checkout runs through Stripe's test mode right now, so no real card is charged.{" "}
-              <button onClick={handleResetLocalDemo} className="underline hover:text-paper-dim">
-                Reset Pro status in this browser
-              </button>{" "}
-              — note this only clears the local flag; it does not cancel anything in Stripe.
-              Real self-serve cancellation needs user accounts, which aren't built yet (see README).
+              Logged in as {authSession.user.email}. Checkout runs through Stripe's test mode right
+              now — use card number 4242 4242 4242 4242, any future expiry date, and any CVC.
             </p>
           ) : (
-            <p>
-              Checkout runs through Stripe's test mode right now — use card number 4242 4242 4242 4242,
-              any future expiry date, and any CVC to simulate a successful payment.
-            </p>
+            <p>Upgrading requires a free account first, so a real payment can be tied to you specifically.</p>
           )}
         </div>
 
@@ -154,8 +173,8 @@ export default function Pricing() {
               <p className="font-semibold text-paper">Can I cancel anytime?</p>
               <p className="mt-1">
                 Once real (non-test) billing is live, yes — Pro will be a standard monthly
-                subscription with no lock-in. Self-serve cancellation from this site specifically
-                needs user accounts, which aren't built yet.
+                subscription with no lock-in. Self-serve cancellation from this site isn't built
+                yet; for now, cancel from Stripe's customer portal or contact support.
               </p>
             </div>
             <div>

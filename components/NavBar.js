@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useSession, signOut } from "next-auth/react";
 
 const LINKS = [
   { href: "/", label: "Home" },
@@ -13,6 +14,7 @@ const LINKS = [
 export default function NavBar() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink-border bg-ink/90 backdrop-blur">
@@ -40,7 +42,22 @@ export default function NavBar() {
           ))}
         </nav>
 
-        <div className="hidden md:block">
+        <div className="hidden items-center gap-4 md:flex">
+          {status === "authenticated" ? (
+            <>
+              <span className="text-sm text-paper-dim">{session.user.email}</span>
+              <button
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="text-sm text-paper-dim hover:text-paper"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <Link href="/login" className="text-sm text-paper-dim hover:text-paper">
+              Log in
+            </Link>
+          )}
           <Link
             href="/find-a-hustle"
             className="rounded-card bg-cash px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-cash-bright"
@@ -83,6 +100,27 @@ export default function NavBar() {
               >
                 Find My Hustle
               </Link>
+            </li>
+            <li className="border-t border-ink-border pt-4">
+              {status === "authenticated" ? (
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    signOut({ callbackUrl: "/" });
+                  }}
+                  className="text-base text-paper-dim hover:text-paper"
+                >
+                  Log out ({session.user.email})
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  className="block text-base text-paper-dim hover:text-paper"
+                  onClick={() => setOpen(false)}
+                >
+                  Log in
+                </Link>
+              )}
             </li>
           </ul>
         </nav>

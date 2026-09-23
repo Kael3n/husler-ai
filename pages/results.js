@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import Button from "../components/Button";
 import HustleCard from "../components/HustleCard";
-import { getFormData, getResults, isPremium } from "../lib/storage";
+import { getFormData, getResults } from "../lib/storage";
 import { RESULT_LIMITS } from "../lib/hustleEngine";
 
 function ProToolsPreview({ topHustle }) {
@@ -91,7 +91,10 @@ export default function Results() {
   useEffect(() => {
     setFormData(getFormData());
     setResults(getResults());
-    setPremium(isPremium());
+    fetch("/api/me")
+      .then((res) => res.json())
+      .then((data) => setPremium(Boolean(data.isPro)))
+      .catch(() => setPremium(false));
   }, []);
 
   if (results === null) {

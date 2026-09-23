@@ -65,36 +65,63 @@ AI API call on top (e.g. to write more personalized "why this matches you" copy,
 entirely new hustles beyond the sample set) via a new Next.js API route that calls the
 Anthropic API server-side.
 
-**Stripe payments** — this is now wired up in test mode. `pages/api/create-checkout-session.js`
-creates a real Stripe Checkout Session, `pages/pricing.js` redirects to it, and
-`pages/api/verify-session.js` confirms server-side that a session actually shows a completed
-payment before unlocking Pro. Two environment variables are required — set these in
-**Vercel → your project → Settings → Environment Variables** (never commit them to the repo):
+**Stripe payments + accounts + a database** — all now wired up together, since a real payment
+needs a real account to attach to. Here's the full setup, in order:
+
+### 1. Create a database
+
+In your Vercel project: **Storage tab → Create Database → Postgres (Neon)**. Follow the
+prompts to connect it to this project — Vercel automatically adds a `DATABASE_URL`
+environment variable for you. `lib/db.js` creates the one table it needs (`users`)
+automatically the first time it's queried — no manual migration step required.
+
+### 2. Add the auth secret
+
+Add one more environment variable in **Vercel → Settings → Environment Variables**:
 
 ```
-STRIPE_SECRET_KEY   your sk_test_... key (sk_live_... once you go live)
-STRIPE_PRICE_ID     the price_... ID for the $7.99/month Pro plan
+NEXTAUTH_SECRET   any long random string, e.g. output of: openssl rand -base64 32
 ```
 
-After adding them, redeploy (Vercel does this automatically on the next push, or you can
-trigger a redeploy manually from the Deployments tab). To test a payment without a real card,
-use Stripe's test card number `4242 4242 4242 4242`, any future expiry date, and any CVC.
+### 3. Set up the Stripe webhook
 
-**Known limitation:** Pro status still only lives in the browser's `localStorage`, exactly
-like the old demo toggle — a real payment now unlocks it, but it isn't yet tied to an actual
-account, so it won't follow the same person to a different browser or device, and there's no
-webhook yet to handle subscription cancellations/renewals happening on Stripe's side. Fixing
-that is the next step, and needs the "database + accounts" piece described below first.
+This is what makes "Pro" reliable — Stripe tells your server directly when someone actually
+pays, rather than the browser being trusted to say so.
 
-**A database** — `lib/storage.js`. Every function here (`saveFormData`, `getResults`,
-`isPremium`, etc.) currently reads/writes `localStorage`. The comment at the top shows how to
-swap these for API calls to your own backend once you add one (Postgres, Supabase,
-PlanetScale, etc.) — the rest of the app never needs to change since it only imports from
-this file.
+1. In Stripe's dashboard: **Developers → Webhooks → Add endpoint**.
+2. URL: `https://<your-live-domain>/api/webhooks/stripe`
+3. Events to send: `checkout.session.completed`, `customer.subscription.updated`,
+   `customer.subscription.deleted`.
+4. Copy the **Signing secret** Stripe shows you (starts with `whsec_...`) and add it as an
+   environment variable:
 
-**User accounts** — also `lib/storage.js`, alongside the database note. Once you add auth
-(NextAuth, Clerk, Supabase Auth...), form answers and plan status should be keyed to a real
-user ID server-side instead of (or in addition to) the browser's local storage.
+```
+STRIPE_WEBHOOK_SECRET   whsec_...
+STRIPE_SECRET_KEY       your sk_test_... key (sk_live_... once you go live)
+STRIPE_PRICE_ID         the price_... ID for the $7.99/month Pro plan
+```
+
+### 4. Redeploy
+
+After adding all four environment variables (`DATABASE_URL` is automatic, the other three you
+add manually), redeploy from Vercel's Deployments tab so the new variables actually take
+effect.
+
+### How it fits together
+
+- `pages/signup.js` / `pages/login.js` — account creation and login, via NextAuth
+  (`pages/api/auth/[...nextauth].js`) using email + a bcrypt-hashed password.
+- `pages/api/create-checkout-session.js` — now requires login, and tags the Stripe session
+  with `client_reference_id` so the webhook can reliably match it back to a database row.
+- `pages/api/webhooks/stripe.js` — the source of truth. Only this route ever sets `is_pro`
+  to true in the database, and only in response to a real Stripe event.
+- `pages/api/me.js` — every page that needs to know "is this person Pro?" asks this route,
+  which reads straight from the database, never from anything the browser stored itself.
+
+**To test end-to-end:** sign up for an account, go to Pricing, click Upgrade, and pay with
+Stripe's test card `4242 4242 4242 4242` (any future expiry date, any CVC). Within a couple
+seconds the webhook fires and your account is marked Pro for real, tied to that account
+specifically — logging in from a different browser now correctly shows Pro too.
 
 ## Customizing
 
